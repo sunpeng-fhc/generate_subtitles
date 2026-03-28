@@ -1,0 +1,648 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>字幕 + 学习笔记生成工具</title>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg:      #0d0f14;
+      --surface: #161920;
+      --border:  #252830;
+      --accent:  #4f8ef7;
+      --accent2: #7c5cfc;
+      --green:   #3ecf8e;
+      --yellow:  #f5a623;
+      --red:     #f56565;
+      --text:    #e8eaf0;
+      --muted:   #6b7280;
+      --radius:  12px;
+    }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Noto Sans SC', sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 40px 16px 80px;
+    }
+    header { text-align: center; margin-bottom: 40px; }
+    .logo {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 12px;
+      opacity: 0.8;
+    }
+    h1 {
+      font-size: clamp(22px, 5vw, 36px);
+      font-weight: 700;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      line-height: 1.2;
+    }
+    .subtitle { margin-top: 10px; color: var(--muted); font-size: 13px; }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 24px;
+      width: 100%;
+      max-width: 640px;
+      margin-bottom: 16px;
+    }
+    .card-title {
+      font-size: 11px;
+      font-family: 'JetBrains Mono', monospace;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 18px;
+    }
+
+    /* Drop zone */
+    .drop-zone {
+      border: 2px dashed var(--border);
+      border-radius: var(--radius);
+      padding: 36px 20px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s;
+      position: relative;
+    }
+    .drop-zone:hover, .drop-zone.dragover {
+      border-color: var(--accent);
+      background: rgba(79,142,247,0.05);
+    }
+    .drop-zone input[type="file"] {
+      position: absolute; inset: 0;
+      opacity: 0; cursor: pointer; width: 100%; height: 100%;
+    }
+    .drop-icon { font-size: 32px; margin-bottom: 10px; }
+    .drop-text { font-size: 15px; margin-bottom: 4px; }
+    .drop-hint { font-size: 12px; color: var(--muted); }
+    .file-selected {
+      margin-top: 12px;
+      padding: 8px 14px;
+      background: rgba(79,142,247,0.1);
+      border: 1px solid rgba(79,142,247,0.3);
+      border-radius: 8px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      color: var(--accent);
+      display: none;
+    }
+
+    /* Options */
+    .options-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+    }
+    @media (max-width: 480px) { .options-grid { grid-template-columns: 1fr; } }
+
+    .option-group label {
+      display: block;
+      font-size: 12px;
+      color: var(--muted);
+      margin-bottom: 6px;
+      font-weight: 500;
+    }
+    .option-group select,
+    .option-group textarea {
+      width: 100%;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      padding: 9px 12px;
+      font-size: 13px;
+      font-family: 'Noto Sans SC', sans-serif;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .option-group select {
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%236b7280' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 12px center;
+      padding-right: 32px;
+    }
+    .option-group select:focus,
+    .option-group textarea:focus { border-color: var(--accent); }
+    .option-group textarea { resize: vertical; min-height: 68px; line-height: 1.6; }
+    .hint { margin-top: 5px; font-size: 11px; color: var(--muted); }
+
+    /* Toggle */
+    .toggle-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 14px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      margin-top: 14px;
+    }
+    .toggle-label { font-size: 13px; }
+    .toggle-sub   { font-size: 11px; color: var(--muted); margin-top: 2px; }
+    .toggle {
+      position: relative;
+      width: 42px; height: 24px;
+      flex-shrink: 0;
+    }
+    .toggle input { opacity: 0; width: 0; height: 0; }
+    .toggle-slider {
+      position: absolute; inset: 0;
+      background: var(--border);
+      border-radius: 99px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .toggle-slider::before {
+      content: "";
+      position: absolute;
+      width: 18px; height: 18px;
+      left: 3px; top: 3px;
+      background: #fff;
+      border-radius: 50%;
+      transition: transform 0.2s;
+    }
+    .toggle input:checked + .toggle-slider { background: var(--accent); }
+    .toggle input:checked + .toggle-slider::before { transform: translateX(18px); }
+
+    /* Level selector (only shows when notes on) */
+    #notes-level-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-top: 10px;
+      padding: 10px 14px;
+      background: rgba(79,142,247,0.06);
+      border: 1px solid rgba(79,142,247,0.2);
+      border-radius: 8px;
+    }
+    #notes-level-row label { font-size: 12px; color: var(--muted); white-space: nowrap; }
+    #notes-level-row select {
+      flex: 1;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      padding: 6px 10px;
+      font-size: 13px;
+      font-family: 'Noto Sans SC', sans-serif;
+      outline: none;
+      appearance: none;
+    }
+
+    /* Submit */
+    .btn-submit {
+      width: 100%;
+      max-width: 640px;
+      padding: 14px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      border: none;
+      border-radius: var(--radius);
+      color: #fff;
+      font-size: 15px;
+      font-weight: 600;
+      font-family: 'Noto Sans SC', sans-serif;
+      cursor: pointer;
+      transition: opacity 0.2s, transform 0.1s;
+      margin-bottom: 16px;
+    }
+    .btn-submit:hover  { opacity: 0.9; }
+    .btn-submit:active { transform: scale(0.99); }
+    .btn-submit:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
+    /* Progress */
+    #progress-card { display: none; }
+    .stage-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      font-family: 'JetBrains Mono', monospace;
+      color: var(--accent);
+      margin-bottom: 14px;
+    }
+    .spinner {
+      width: 14px; height: 14px;
+      border: 2px solid rgba(79,142,247,0.3);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .progress-bar-wrap {
+      background: var(--bg);
+      border-radius: 99px;
+      height: 8px;
+      overflow: hidden;
+      margin-bottom: 10px;
+    }
+    .progress-bar-fill {
+      height: 100%;
+      border-radius: 99px;
+      background: linear-gradient(90deg, var(--accent), var(--accent2));
+      transition: width 0.4s ease;
+      width: 0%;
+    }
+    .progress-info {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .progress-pct {
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 600;
+      color: var(--accent);
+    }
+
+    /* Result */
+    #result-card { display: none; }
+    .result-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 18px;
+    }
+    .result-icon {
+      width: 36px; height: 36px;
+      background: rgba(62,207,142,0.15);
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px;
+    }
+    .result-title { font-size: 16px; font-weight: 600; }
+    .result-sub   { font-size: 12px; color: var(--muted); }
+
+    .file-list { display: flex; flex-direction: column; gap: 10px; }
+    .file-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 14px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      gap: 12px;
+    }
+    .file-item.is-notes {
+      border-color: rgba(245,166,35,0.3);
+      background: rgba(245,166,35,0.04);
+    }
+    .file-item-info { flex: 1; overflow: hidden; }
+    .file-item-name {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      color: var(--text);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .file-item-desc { font-size: 11px; color: var(--muted); margin-top: 2px; }
+    .btn-download {
+      flex-shrink: 0;
+      padding: 6px 14px;
+      background: rgba(79,142,247,0.15);
+      border: 1px solid rgba(79,142,247,0.3);
+      border-radius: 6px;
+      color: var(--accent);
+      font-size: 12px;
+      font-family: 'Noto Sans SC', sans-serif;
+      cursor: pointer;
+      text-decoration: none;
+      transition: background 0.2s;
+    }
+    .btn-download:hover { background: rgba(79,142,247,0.25); }
+    .btn-download.notes-btn {
+      background: rgba(245,166,35,0.15);
+      border-color: rgba(245,166,35,0.3);
+      color: var(--yellow);
+    }
+    .btn-download.notes-btn:hover { background: rgba(245,166,35,0.25); }
+
+    .btn-again {
+      width: 100%;
+      margin-top: 16px;
+      padding: 11px;
+      background: transparent;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      color: var(--muted);
+      font-size: 14px;
+      font-family: 'Noto Sans SC', sans-serif;
+      cursor: pointer;
+      transition: border-color 0.2s, color 0.2s;
+    }
+    .btn-again:hover { border-color: var(--accent); color: var(--accent); }
+
+    .error-box {
+      padding: 14px;
+      background: rgba(245,101,101,0.1);
+      border: 1px solid rgba(245,101,101,0.3);
+      border-radius: 8px;
+      font-size: 13px;
+      color: var(--red);
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .info-tags {
+      display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px;
+    }
+    .tag {
+      padding: 4px 10px;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid var(--border);
+      border-radius: 99px;
+      font-size: 11px;
+      color: var(--muted);
+    }
+    .tag span { color: var(--text); }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="logo">Subtitle + Study Notes Generator</div>
+    <h1>字幕 &amp; 学习笔记生成工具</h1>
+    <p class="subtitle">Whisper 识别 · Qwen2.5:32b 翻译 · 自动生成学习笔记 · 本地免费</p>
+  </header>
+
+  <!-- 上传 -->
+  <div class="card" id="upload-card">
+    <div class="card-title">01 · 上传音频</div>
+    <div class="drop-zone" id="drop-zone">
+      <input type="file" id="audio-file" accept=".mp3,.wav,.m4a,.flac" />
+      <div class="drop-icon">🎵</div>
+      <div class="drop-text">点击选择或拖拽音频文件</div>
+      <div class="drop-hint">支持 MP3 · WAV · M4A · FLAC</div>
+      <div class="file-selected" id="file-selected"></div>
+    </div>
+  </div>
+
+  <!-- 设置 -->
+  <div class="card">
+    <div class="card-title">02 · 设置选项</div>
+
+    <div class="options-grid">
+      <div class="option-group">
+        <label>Whisper 模型</label>
+        <select id="model-size">
+          <option value="tiny">Tiny（最快）</option>
+          <option value="base">Base</option>
+          <option value="small">Small</option>
+          <option value="medium" selected>Medium（推荐）</option>
+          <option value="large-v3">Large-v3（最准）</option>
+        </select>
+      </div>
+      <div class="option-group">
+        <label>输出字幕类型</label>
+        <select id="output-mode">
+          <option value="both" selected>英文 + 双语</option>
+          <option value="bilingual">仅双语</option>
+          <option value="english">仅英文</option>
+        </select>
+      </div>
+      <div class="option-group">
+        <label>分段时长（秒）</label>
+        <select id="segment-time">
+          <option value="300">300 秒（5 分钟）</option>
+          <option value="600" selected>600 秒（10 分钟）</option>
+          <option value="900">900 秒（15 分钟）</option>
+          <option value="1800">1800 秒（30 分钟）</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="option-group" style="margin-top:14px;">
+      <label>节目背景（提升翻译准确度）</label>
+      <textarea id="podcast-context">这是一档英语学习播客，主持人用简单英语讨论日常生活话题，面向中级英语学习者。</textarea>
+      <div class="hint">根据你的播客类型修改，例如：商业访谈、科技新闻、日常对话等</div>
+    </div>
+
+    <!-- 学习笔记开关 -->
+    <div class="toggle-row">
+      <div>
+        <div class="toggle-label">📚 同时生成学习笔记</div>
+        <div class="toggle-sub">自动总结重点词汇、词组、句型和语法（约多需 1-2 分钟）</div>
+      </div>
+      <label class="toggle">
+        <input type="checkbox" id="gen-notes" checked onchange="toggleNotesLevel()" />
+        <span class="toggle-slider"></span>
+      </label>
+    </div>
+
+    <div id="notes-level-row">
+      <label>学习水平</label>
+      <select id="study-level">
+        <option value="A2">A2 入门级（基础词汇，详细解释）</option>
+        <option value="B1" selected>B1 中级（日常对话，常见语法）</option>
+        <option value="B2">B2 中高级（地道表达，高频短语）</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- 提交按钮 -->
+  <button class="btn-submit" id="btn-submit" disabled onclick="startJob()">
+    选择文件后开始生成
+  </button>
+
+  <!-- 进度 -->
+  <div class="card" id="progress-card">
+    <div class="card-title">03 · 处理进度</div>
+    <div class="stage-badge">
+      <div class="spinner" id="spinner"></div>
+      <span id="stage-text">准备中...</span>
+    </div>
+    <div class="progress-bar-wrap">
+      <div class="progress-bar-fill" id="progress-fill"></div>
+    </div>
+    <div class="progress-info">
+      <span id="progress-msg">请稍候...</span>
+      <span class="progress-pct" id="progress-pct">0%</span>
+    </div>
+  </div>
+
+  <!-- 结果 -->
+  <div class="card" id="result-card">
+    <div class="result-header">
+      <div class="result-icon">✅</div>
+      <div>
+        <div class="result-title">生成完成</div>
+        <div class="result-sub">点击下载文件</div>
+      </div>
+    </div>
+    <div class="file-list" id="file-list"></div>
+    <div class="info-tags">
+      <div class="tag">Whisper <span id="tag-model">medium</span></div>
+      <div class="tag">翻译 <span>Qwen2.5:32b</span></div>
+      <div class="tag">本地运行 <span>完全免费</span></div>
+    </div>
+    <button class="btn-again" onclick="resetApp()">↩ 处理另一个文件</button>
+  </div>
+
+  <script>
+    const audioInput = document.getElementById('audio-file');
+    const dropZone   = document.getElementById('drop-zone');
+    const fileLabel  = document.getElementById('file-selected');
+    const btnSubmit  = document.getElementById('btn-submit');
+
+    // 文件选择
+    audioInput.addEventListener('change', () => updateFileLabel(audioInput.files[0]));
+    dropZone.addEventListener('dragover',  e => { e.preventDefault(); dropZone.classList.add('dragover'); });
+    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+    dropZone.addEventListener('drop', e => {
+      e.preventDefault();
+      dropZone.classList.remove('dragover');
+      const file = e.dataTransfer.files[0];
+      if (!file) return;
+      const dt = new DataTransfer();
+      dt.items.add(file);
+      audioInput.files = dt.files;
+      updateFileLabel(file);
+    });
+
+    function updateFileLabel(file) {
+      if (!file) return;
+      const mb = (file.size / 1024 / 1024).toFixed(1);
+      fileLabel.textContent = `📎 ${file.name}  (${mb} MB)`;
+      fileLabel.style.display = 'block';
+      btnSubmit.disabled = false;
+      btnSubmit.textContent = '开始生成字幕和学习笔记 →';
+    }
+
+    function toggleNotesLevel() {
+      const on = document.getElementById('gen-notes').checked;
+      document.getElementById('notes-level-row').style.display = on ? 'flex' : 'none';
+      btnSubmit.textContent = on
+        ? '开始生成字幕和学习笔记 →'
+        : '开始生成字幕 →';
+    }
+
+    // 提交
+    async function startJob() {
+      const file = audioInput.files[0];
+      if (!file) return;
+
+      btnSubmit.disabled = true;
+      btnSubmit.textContent = '正在上传...';
+
+      const fd = new FormData();
+      fd.append('audio',        file);
+      fd.append('model',        document.getElementById('model-size').value);
+      fd.append('output_mode',  document.getElementById('output-mode').value);
+      fd.append('segment_time', document.getElementById('segment-time').value);
+      fd.append('context',      document.getElementById('podcast-context').value);
+      fd.append('gen_notes',    document.getElementById('gen-notes').checked ? 'true' : 'false');
+      fd.append('study_level',  document.getElementById('study-level').value);
+
+      document.getElementById('tag-model').textContent =
+        document.getElementById('model-size').value;
+
+      try {
+        const res  = await fetch('/upload', { method: 'POST', body: fd });
+        const data = await res.json();
+        if (data.error) { alert('上传失败：' + data.error); resetBtn(); return; }
+        showProgress();
+        pollStatus(data.job_id);
+      } catch (e) {
+        alert('网络错误：' + e.message);
+        resetBtn();
+      }
+    }
+
+    // 轮询
+    let pollingTimer = null;
+    function pollStatus(jobId) {
+      pollingTimer = setInterval(async () => {
+        try {
+          const res  = await fetch(`/status/${jobId}`);
+          const data = await res.json();
+          updateProgress(data);
+          if (data.done) {
+            clearInterval(pollingTimer);
+            if (data.error) showError(data.error);
+            else            showResult(data.files);
+          }
+        } catch (e) { console.error('轮询失败', e); }
+      }, 1200);
+    }
+
+    function showProgress() {
+      document.getElementById('upload-card').style.opacity = '0.4';
+      document.getElementById('progress-card').style.display = 'block';
+    }
+
+    function updateProgress(data) {
+      document.getElementById('stage-text').textContent   = stageLabel(data.stage);
+      document.getElementById('progress-msg').textContent = data.message || '';
+      document.getElementById('progress-pct').textContent = (data.progress || 0) + '%';
+      document.getElementById('progress-fill').style.width = (data.progress || 0) + '%';
+    }
+
+    function stageLabel(stage) {
+      const map = {
+        queued: '排队中', analyzing: '分析音频',
+        splitting: '分段处理', loading_model: '加载模型',
+        transcribing: '语音识别', writing_en: '生成英文字幕',
+        translating: '翻译字幕', writing_bilingual: '生成双语字幕',
+        notes: '生成学习笔记', done: '完成',
+      };
+      return map[stage] || stage || '处理中';
+    }
+
+    function showResult(files) {
+      document.getElementById('spinner').style.display = 'none';
+      document.getElementById('progress-card').style.display = 'none';
+      document.getElementById('result-card').style.display = 'block';
+
+      const list = document.getElementById('file-list');
+      list.innerHTML = '';
+      files.forEach(path => {
+        const name      = path.split('/').pop();
+        const isNotes   = name.includes('学习笔记');
+        const isBi      = name.includes('双语');
+        const icon      = isNotes ? '📚' : isBi ? '🌐' : '🇬🇧';
+        const desc      = isNotes ? `学习笔记 · Markdown 格式` : isBi ? '双语字幕 · SRT 格式' : '英文字幕 · SRT 格式';
+        list.innerHTML += `
+          <div class="file-item ${isNotes ? 'is-notes' : ''}">
+            <div class="file-item-info">
+              <div class="file-item-name">${icon} ${name}</div>
+              <div class="file-item-desc">${desc}</div>
+            </div>
+            <a class="btn-download ${isNotes ? 'notes-btn' : ''}"
+               href="/download?path=${encodeURIComponent(path)}" download>
+              下载
+            </a>
+          </div>`;
+      });
+    }
+
+    function showError(msg) {
+      document.getElementById('spinner').style.display = 'none';
+      document.getElementById('progress-card').innerHTML +=
+        `<div class="error-box" style="margin-top:14px">❌ ${msg}</div>
+         <button class="btn-again" onclick="resetApp()" style="margin-top:12px">↩ 重试</button>`;
+    }
+
+    function resetBtn() {
+      btnSubmit.disabled = false;
+      btnSubmit.textContent = '开始生成字幕和学习笔记 →';
+    }
+
+    function resetApp() { location.reload(); }
+  </script>
+</body>
+</html>
