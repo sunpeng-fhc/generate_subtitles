@@ -27,7 +27,8 @@
 
 ## 📸 界面预览 Screenshot
 
-> *(可在此处放截图)*
+> *<img width="1318" height="1798" alt="image" src="https://github.com/user-attachments/assets/e1f96413-9f12-4fc4-ad7c-cbe8e81fe878" />
+*
 
 ---
 
